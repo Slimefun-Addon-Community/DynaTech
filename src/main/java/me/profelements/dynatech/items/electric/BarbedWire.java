@@ -17,16 +17,18 @@ import org.bukkit.util.Vector;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class BarbedWire extends AMachine {
-    private static final int MAX_DIRECTION_VEL = 10000;
+    private static final int MAX_DIRECTION_VEL = 50;
+    private static final double MAX_RANGE = 9D;
+    private static final double PUSH_POWER = 2D;
 
     public BarbedWire(ItemGroup itemGroup, SlimefunItemStack item, RecipeType recipeType, ItemStack[] recipe) {
         super(itemGroup, item, recipeType, recipe);
     }
-    
-    
+
     @Override
     public void tick(Block b) {
         if (getCharge(b.getLocation()) < getEnergyConsumption())  {
@@ -35,46 +37,38 @@ public class BarbedWire extends AMachine {
         
         DynaTech.runSync(()->sendEntitiesFlying(b.getLocation(), b.getWorld()));
         removeCharge(b.getLocation(), getEnergyConsumption());
-
     }
 
     public void sendEntitiesFlying(@Nonnull Location loc, @Nonnull World w) {
         List<Entity> shotEntities = new ArrayList<>();
         int waitTime = 0;
-        for (Entity e : w.getNearbyEntities(loc, 9, 9, 9)) {
-            Vector tempV = e.getVelocity();
-            if (e.getType() != EntityType.PLAYER && e.getType() != EntityType.ARMOR_STAND && e.getType() != EntityType.DROPPED_ITEM && !shotEntities.contains(e)) {
-                Vector tempV2 = tempV.multiply(-1).multiply(1.2).add(new Vector(1, 0.7, 1));
-                
-                if (tempV2.getX() >= MAX_DIRECTION_VEL || tempV2.getY() >= MAX_DIRECTION_VEL || tempV2.getZ() >= MAX_DIRECTION_VEL) {
-                    tempV2 = new Vector(0, 0, 0);
-                }
 
-
-                if (NumberConversions.isFinite(tempV2.getX()) && NumberConversions.isFinite(tempV2.getY()) && NumberConversions.isFinite(tempV2.getZ())) {
-                    e.setVelocity(tempV2);
-                    shotEntities.add(e);  
-                } else if (NumberConversions.isFinite(tempV.getX()) && NumberConversions.isFinite(tempV.getY()) && NumberConversions.isFinite(tempV.getZ())) {
-                    e.setVelocity(tempV);
-                } else {
+        Vector wirePosition = new Vector(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()).add(new Vector(0.5, 0, 0.5));
+        Collection<Entity> nearbyEntites = w.getNearbyEntities(loc, MAX_RANGE, MAX_RANGE, MAX_RANGE);
+        for (Entity e : nearbyEntites) {
+            Vector entityVelocity = e.getVelocity();
+            if (isLaunchableEntity(shotEntities, e)) {
+                Vector pushVelocity = calcPushVelocity(wirePosition, e, entityVelocity);
+                if (NumberConversions.isFinite(pushVelocity.getX()) && NumberConversions.isFinite(pushVelocity.getY()) && NumberConversions.isFinite(pushVelocity.getZ())) {
+                    e.setVelocity(pushVelocity);
+                    shotEntities.add(e);
+                } else if (!NumberConversions.isFinite(entityVelocity.getX()) || !NumberConversions.isFinite(entityVelocity.getY()) || !NumberConversions.isFinite(entityVelocity.getZ())) {
                     e.setVelocity(new Vector(0, 0, 0));
                 }
+            }
 
-            }
             if (shotEntities.contains(e) && waitTime > 8) {
-                e.setVelocity(tempV);
+                e.setVelocity(entityVelocity);
             }
-            
-			waitTime++;   
+
+            waitTime++;
         }
     }
-
 
     @Override
     public String getMachineIdentifier() {
         return "BARBED_WIRE";
     }
-
 
     @Override
     public boolean isGraphical() {
@@ -86,4 +80,58 @@ public class BarbedWire extends AMachine {
         return new ItemStack(Material.IRON_BARS);
     }
     
+    private boolean isLaunchableEntity(List<Entity> shotEntities, Entity e) {
+        return e.getType() != EntityType.PLAYER
+            && e.getType() != EntityType.ARMOR_STAND
+            && e.getType() != EntityType.DROPPED_ITEM
+            && !shotEntities.contains(e);
+    }
+
+    private Vector limitVelocity(Vector velocity) {
+        if (velocity.getX() >= MAX_DIRECTION_VEL || velocity.getY() >= MAX_DIRECTION_VEL || velocity.getZ() >= MAX_DIRECTION_VEL) {
+            velocity = new Vector(0, 0, 0);
+        }
+        return velocity;
+    }
+    
+    private Vector calcPushVelocity(Vector wirePosition, Entity e, Vector entityVelocity) {
+        Location entityLocation = e.getLocation();
+        Vector entityPosition = new Vector(entityLocation.getX(), entityLocation.getY(), entityLocation.getZ());
+        Vector offset = entityPosition.subtract(wirePosition);
+        Vector unit = fastNormalize(offset);
+        double distanceSq = offset.lengthSquared();
+        Vector extraVelocity = unit.multiply(PUSH_POWER / distanceSq);
+        return limitVelocity(entityVelocity.add(extraVelocity));
+    }
+
+    private Vector fastNormalize(Vector v) {
+        float length = fastLength(v);
+        v.multiply(length);
+
+        return v;
+    }
+
+    private float fastLength(Vector v) {
+        double x = v.getX();
+        double y = v.getY();
+        double z = v.getZ();
+
+        return fastSqrt(x * x + y * y + z * z);
+    }
+
+    private float fastSqrt(double double_num) {
+        int i;
+        float x2, y;
+        float threehalfs = 1.5F;
+        float num = (float) double_num;
+
+        x2 = num * 0.5F;
+        y = num;
+        i = Float.floatToIntBits(y);
+        i = 0x5f3759df - (i >> 1);
+        y = Float.intBitsToFloat(i);
+        y = y * (threehalfs - (x2 * y * y));
+
+        return y;
+    }
 }
