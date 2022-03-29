@@ -13,6 +13,7 @@ import me.profelements.dynatech.listeners.InventoryFilterListener;
 import me.profelements.dynatech.listeners.PicnicBasketListener;
 import me.profelements.dynatech.setup.DynaTechItemsSetup;
 import me.profelements.dynatech.tasks.ItemBandTask;
+import me.profelements.dynatech.tasks.AntigravityBubbleTask;
 import org.apache.commons.lang.Validate;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -68,6 +69,12 @@ public class DynaTech extends JavaPlugin implements SlimefunAddon {
             getLogger().log(Level.WARNING, "           DynaTech will be switching to JAVA 11        ");
             getLogger().log(Level.WARNING, "                Please Update to JAVA 11                ");
         }
+
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(DynaTech.getInstance(), new Runnable() {
+            public void run() {
+                AntigravityBubbleTask.run();
+            }
+        }, 0, 60);
     }
 
     @Override
