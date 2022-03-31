@@ -11,6 +11,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+
+/**
+ * @author Fhoz https://github.com/Fhoz
+*/
 public class AntigravityBubbleTask {
     static Set<Location> bubbleLocations = new HashSet<>();
     static Set<UUID> bubbledPlayers = new HashSet<>();
