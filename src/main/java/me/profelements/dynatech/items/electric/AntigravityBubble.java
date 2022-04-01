@@ -9,7 +9,8 @@ import io.github.thebusybiscuit.slimefun4.core.handlers.BlockBreakHandler;
 import me.mrCookieSlime.CSCoreLibPlugin.Configuration.Config;
 import me.mrCookieSlime.Slimefun.Objects.handlers.BlockTicker;
 import me.profelements.dynatech.items.electric.abstracts.AMachine;
-import me.profelements.dynatech.tasks.AntigravityBubbleTask;
+
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -20,11 +21,20 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
+/**
+ * @author ProfElements https://github.com/ProfElements
+ * @author Fhoz https://github.com/Fhoz
+*/
 public class AntigravityBubble extends AMachine {
-
-    private static Location bubbleLocation;
+    private static final Map<Location, Set<UUID>> allEnabledPlayers = new HashMap<>();
+    private static final Set<UUID> allUuids = new HashSet<>();
     private static final int[] BORDER = new int[] { 1, 2, 6, 7, 9, 10, 11, 15, 16, 17, 19, 20, 24, 25 };
     private static final int[] BORDER_IN = new int[] { 3, 4, 5, 12, 14, 21, 22, 23 };
     private static final int[] BORDER_OUT = new int[] { 0, 8, 18, 26 };
@@ -53,29 +63,72 @@ public class AntigravityBubble extends AMachine {
 
     @Override
     public void tick(Block b) {
-        bubbleLocation = b.getLocation();
-        AntigravityBubbleTask.addBubble(bubbleLocation);
-
+        Set<UUID> tempUuids = new HashSet<>();
+        tempUuids.clear();
         Collection<Entity> bubbledEntities = b.getWorld().getNearbyEntities(b.getLocation(), 25, 25, 25);
-        
         for (Entity entity : bubbledEntities) {
             if (entity instanceof Player) {
                 Player p = (Player) entity;
+                if (allEnabledPlayers.get(b.getLocation()) == null) {
+                    tempUuids.add(p.getUniqueId());
+                    allEnabledPlayers.put(b.getLocation(), tempUuids);
+                } else {
+                    
+                    allEnabledPlayers.get(b.getLocation()).add(p.getUniqueId());
+                }
                 if (!p.getAllowFlight()) {
+                    p.setAllowFlight(true);
                     removeCharge(b.getLocation(), getEnergyConsumption());
                 }
             }
         }
+
+
+
+        if (allEnabledPlayers.get(b.getLocation()) != null) {
+            for (UUID uuid : allEnabledPlayers.get(b.getLocation())) {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null && !bubbledEntities.contains(p)) {
+                    allEnabledPlayers.get(b.getLocation()).remove(p.getUniqueId());
+                    checkPlayer(p.getUniqueId());
+                }
+            }
+        }
+    }
+
+    private void checkPlayer(UUID u) {
+        allUuids.clear();
+        for (Map.Entry<Location, Set<UUID>> entry : allEnabledPlayers.entrySet()) {
+            Set<UUID> uuidSet = entry.getValue();
+            for (UUID uuid : uuidSet) {
+                if (!allUuids.contains(uuid)) {
+                    allUuids.add(uuid);
+                }
+            }
+        }
+
+        if (!allUuids.contains(u)) {
+            Player p = Bukkit.getPlayer(u);
+            p.setAllowFlight(false);
+            p.setFlying(false);
+            p.setFallDistance(0.0f);
+        }
     }
         
     private ItemHandler onBlockBreak() {
-        AntigravityBubbleTask.removeBubble(bubbleLocation);
         return new BlockBreakHandler(false, false) {
         
             @Override
             public void onPlayerBreak(BlockBreakEvent e, ItemStack tool, List<ItemStack> drops) {
-                
-                AntigravityBubbleTask.removeBubble(e.getBlock().getLocation());
+                if (allEnabledPlayers.get(e.getBlock().getLocation()) != null) {
+                    for (UUID uuid : allEnabledPlayers.get(e.getBlock().getLocation())) {
+                        Player p = Bukkit.getPlayer(uuid);
+                        if (p != null) {
+                            allEnabledPlayers.get(e.getBlock().getLocation()).remove(p.getUniqueId());
+                            checkPlayer(p.getUniqueId());
+                        }
+                    }
+                }
             }
         };
     }
