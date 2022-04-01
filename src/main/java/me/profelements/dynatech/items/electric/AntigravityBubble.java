@@ -63,19 +63,13 @@ public class AntigravityBubble extends AMachine {
 
     @Override
     public void tick(Block b) {
-        Set<UUID> tempUuids = new HashSet<>();
-        tempUuids.clear();
+        Set<UUID> playersInBubble = allEnabledPlayers.getOrDefault(b.getLocation(), new HashSet<>());
         Collection<Entity> bubbledEntities = b.getWorld().getNearbyEntities(b.getLocation(), 25, 25, 25);
         for (Entity entity : bubbledEntities) {
-            if (entity instanceof Player) {
+            if (entity instanceof Player && getCharge(b.getLocation()) >= getEnergyConsumption()) {
                 Player p = (Player) entity;
-                if (allEnabledPlayers.get(b.getLocation()) == null) {
-                    tempUuids.add(p.getUniqueId());
-                    allEnabledPlayers.put(b.getLocation(), tempUuids);
-                } else {
-                    
-                    allEnabledPlayers.get(b.getLocation()).add(p.getUniqueId());
-                }
+                playersInBubble.add(p.getUniqueId());
+                allEnabledPlayers.put(b.getLocation(), playersInBubble);
                 if (!p.getAllowFlight()) {
                     p.setAllowFlight(true);
                     removeCharge(b.getLocation(), getEnergyConsumption());
@@ -83,15 +77,11 @@ public class AntigravityBubble extends AMachine {
             }
         }
 
-
-
-        if (allEnabledPlayers.get(b.getLocation()) != null) {
-            for (UUID uuid : allEnabledPlayers.get(b.getLocation())) {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null && !bubbledEntities.contains(p)) {
-                    allEnabledPlayers.get(b.getLocation()).remove(p.getUniqueId());
-                    checkPlayer(p.getUniqueId());
-                }
+        for (UUID uuid : playersInBubble) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null && !bubbledEntities.contains(p)) {
+                allEnabledPlayers.get(b.getLocation()).remove(p.getUniqueId());
+                checkPlayer(p.getUniqueId());
             }
         }
     }
