@@ -246,7 +246,7 @@ public class Tesseract extends SlimefunItem implements EnergyNetProvider {
 
     @Override
     public int getCapacity() {
-        return capacity;
+        return 65535;
     }
 
     public int getEnergyRate() {
